@@ -8,62 +8,29 @@ import org.delcom.tables.TodoTable
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
-import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.lowerCase
-import org.jetbrains.exposed.sql.selectAll
 import java.util.*
 
-class TodoRepository : ITodoRepository {
-
-    override suspend fun getAll(
-        userId: String,
-        search: String,
-        page: Int,
-        perPage: Int,
-        isDone: Boolean?,
-        urgency: String?
-    ): Pair<List<Todo>, Long> = suspendTransaction {
-        val offset = ((page - 1) * perPage).toLong()
-
-        val query = TodoTable.selectAll()
-            .where { TodoTable.userId eq UUID.fromString(userId) }
-
-        if (search.isNotBlank()) {
+class TodoRepository(private val baseUrl: String) : ITodoRepository {
+    override suspend fun getAll(userId: String, search: String): List<Todo> = suspendTransaction {
+        if (search.isBlank()) {
+            TodoDAO
+                .find {
+                    (TodoTable.userId eq UUID.fromString(userId))
+                }
+                .orderBy(TodoTable.createdAt to SortOrder.DESC)
+                .map{ todoDAOToModel(it, baseUrl) }
+        } else {
             val keyword = "%${search.lowercase()}%"
-            query.andWhere { TodoTable.title.lowerCase() like keyword }
+
+            TodoDAO
+                .find {
+                    TodoTable.title.lowerCase() like keyword
+                }
+                .orderBy(TodoTable.title to SortOrder.ASC)
+                .map{ todoDAOToModel(it, baseUrl) }
         }
-
-        if (isDone != null) {
-            query.andWhere { TodoTable.isDone eq isDone }
-        }
-
-        if (!urgency.isNullOrBlank()) {
-            query.andWhere { TodoTable.urgency eq urgency }
-        }
-
-        val total = query.count()
-
-        val todos = TodoDAO.wrapRows(
-            query.orderBy(TodoTable.createdAt to SortOrder.DESC)
-                .limit(perPage)
-                .offset(offset)
-        ).map(::todoDAOToModel)
-
-        Pair(todos, total)
-    }
-
-    override suspend fun getStats(userId: String): Triple<Long, Long, Long> = suspendTransaction {
-        val total = TodoTable.selectAll()
-            .where { TodoTable.userId eq UUID.fromString(userId) }
-            .count()
-
-        val done = TodoTable.selectAll()
-            .where { (TodoTable.userId eq UUID.fromString(userId)) and (TodoTable.isDone eq true) }
-            .count()
-
-        val pending = total - done
-        Triple(total, done, pending)
     }
 
     override suspend fun getById(todoId: String): Todo? = suspendTransaction {
@@ -72,7 +39,7 @@ class TodoRepository : ITodoRepository {
                 (TodoTable.id eq UUID.fromString(todoId))
             }
             .limit(1)
-            .map(::todoDAOToModel)
+            .map{ todoDAOToModel(it, baseUrl) }
             .firstOrNull()
     }
 
@@ -83,7 +50,6 @@ class TodoRepository : ITodoRepository {
             description = todo.description
             cover = todo.cover
             isDone = todo.isDone
-            urgency = todo.urgency
             createdAt = todo.createdAt
             updatedAt = todo.updatedAt
         }
@@ -105,7 +71,6 @@ class TodoRepository : ITodoRepository {
             todoDAO.description = newTodo.description
             todoDAO.cover = newTodo.cover
             todoDAO.isDone = newTodo.isDone
-            todoDAO.urgency = newTodo.urgency
             todoDAO.updatedAt = newTodo.updatedAt
             true
         } else {
@@ -120,4 +85,5 @@ class TodoRepository : ITodoRepository {
         }
         rowsDeleted >= 1
     }
+
 }

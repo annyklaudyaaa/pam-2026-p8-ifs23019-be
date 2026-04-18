@@ -21,6 +21,7 @@ fun Application.configureRouting() {
     val userService: UserService by inject()
 
     install(StatusPages) {
+        // Tangkap AppException
         exception<AppException> { call, cause ->
             val dataMap: Map<String, List<String>> = parseMessageToMap(cause.message)
 
@@ -34,6 +35,7 @@ fun Application.configureRouting() {
             )
         }
 
+        // Tangkap semua Throwable lainnya
         exception<Throwable> { call, cause ->
             call.respond(
                 status = HttpStatusCode.fromValue(500),
@@ -48,7 +50,7 @@ fun Application.configureRouting() {
 
     routing {
         get("/") {
-            call.respondText("API telah berjalan. Dibuat oleh Anny Klaudya.")
+            call.respondText("API telah berjalan. Dibuat oleh Aisah Sipahutar.")
         }
 
         // Route Auth
@@ -62,6 +64,7 @@ fun Application.configureRouting() {
             post("/refresh-token") {
                 authService.postRefreshToken(call)
             }
+
             post("/logout") {
                 authService.postLogout(call)
             }
@@ -82,18 +85,10 @@ fun Application.configureRouting() {
                 put("/me/photo") {
                     userService.putMyPhoto(call)
                 }
-                // Endpoint baru: ubah teks Tentang
-                put("/me/about") {
-                    userService.putMyAbout(call)
-                }
             }
 
             // Route Todos
             route("/todos") {
-                // Endpoint baru: statistik todo
-                get("/stats") {
-                    todoService.getStats(call)
-                }
                 get {
                     todoService.getAll(call)
                 }
@@ -119,9 +114,11 @@ fun Application.configureRouting() {
             get("users/{id}") {
                 userService.getPhoto(call)
             }
+
             get("todos/{id}") {
                 todoService.getCover(call)
             }
         }
+
     }
 }

@@ -13,8 +13,8 @@ data class Todo(
     var title: String,
     var description: String,
     var isDone: Boolean = false,
-    var urgency: String = "medium",
-    var cover: String? = null,
+    var cover: String?,
+    var urlCover: String = "",
 
     @Contextual
     val createdAt: Instant = Clock.System.now(),
